@@ -1,0 +1,103 @@
+import os
+import random
+import tkinter as tk
+from tkinter import filedialog
+from PIL import Image, ImageTk
+
+class Slideshow:
+    def __init__(self, folder_path, display_time=3):
+        self.folder_path = folder_path
+        self.display_time = display_time * 1000  # Convert seconds to milliseconds
+        self.files = [f for f in os.listdir(folder_path) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif'))]
+        
+        if not self.files:
+            print("No images found in the folder.")
+            return
+        
+        random.shuffle(self.files)
+        self.index = 0
+        self.is_paused = False  # For handling pause/resume
+        self.fluid_ratio = False  # For toggling Fluid Ratio mode
+        
+        self.root = tk.Tk()
+        self.root.title("Image Slideshow")
+        self.root.attributes("-fullscreen", True)
+        self.root.configure(bg='black')  # Set the background color to black
+        
+        self.root.bind("<Escape>", lambda e: self.root.destroy())
+        self.root.bind("<Left>", self.show_previous_image)
+        self.root.bind("<Right>", self.show_next_image)
+        self.root.bind("<space>", self.toggle_pause)  # Bind spacebar to pause/resume
+        self.root.bind("r", self.toggle_ratio)  # Bind 'R' key to toggle Fluid Ratio
+        
+        # Bind mouse controls
+        self.root.bind("<Button-1>", self.toggle_pause)  # Left Click to pause/unpause
+        self.root.bind("<Button-3>", self.toggle_ratio)  # Right Click to toggle Fluid Ratio
+        self.root.bind("<MouseWheel>", self.scroll_image)  # Scroll Wheel to navigate
+        
+        self.panel = tk.Label(self.root, bg='black')  # Set the panel background to black
+        self.panel.pack(side="bottom", fill="both", expand="yes")
+        
+        self.show_image()
+        self.root.after(self.display_time, self.update_image)  # Schedule the next image
+        
+        self.root.mainloop()
+    
+    def show_image(self):
+        image_path = os.path.join(self.folder_path, self.files[self.index])
+        img = Image.open(image_path)
+        
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        
+        if self.fluid_ratio:
+            img.thumbnail((screen_width, screen_height), Image.LANCZOS)
+            # Calculate position to center the image
+            x_offset = (screen_width - img.width) // 2
+            y_offset = (screen_height - img.height) // 2
+            self.panel.place(x=x_offset, y=y_offset)
+        else:
+            img = img.resize((screen_width, screen_height), Image.LANCZOS)
+            self.panel.place(x=0, y=0)
+        
+        img = ImageTk.PhotoImage(img)
+        
+        self.panel.configure(image=img)
+        self.panel.image = img
+    
+    def update_image(self):
+        if not self.is_paused:
+            self.show_next_image()
+        self.root.after(self.display_time, self.update_image)  # Schedule the next image
+    
+    def show_next_image(self, event=None):
+        self.index = (self.index + 1) % len(self.files)
+        self.show_image()
+    
+    def show_previous_image(self, event=None):
+        self.index = (self.index - 1) % len(self.files)
+        self.show_image()
+    
+    def toggle_pause(self, event=None):
+        self.is_paused = not self.is_paused  # Toggle pause state
+    
+    def toggle_ratio(self, event=None):
+        self.fluid_ratio = not self.fluid_ratio  # Toggle Fluid Ratio mode
+        self.show_image()  # Refresh the current image with the new setting
+    
+    def scroll_image(self, event):
+        if event.delta > 0:  # Scroll Up
+            self.show_next_image()
+        else:  # Scroll Down
+            self.show_previous_image()
+
+def select_folder():
+    # Open a dialog to select a folder
+    folder_path = filedialog.askdirectory(title="Select Folder")
+    return folder_path
+
+# Start the program with folder selection
+if __name__ == "__main__":
+    folder_path = select_folder()
+    if folder_path:  # Check if a folder was selected
+        Slideshow(folder_path)
